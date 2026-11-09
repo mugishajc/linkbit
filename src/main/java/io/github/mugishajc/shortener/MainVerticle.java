@@ -1,6 +1,7 @@
 package io.github.mugishajc.shortener;
 
 import io.github.mugishajc.shortener.service.LinkService;
+import io.github.mugishajc.shortener.service.UrlValidator;
 import io.github.mugishajc.shortener.store.InMemoryLinkStore;
 import io.github.mugishajc.shortener.web.ApiException;
 import io.github.mugishajc.shortener.web.LinkRoutes;
@@ -10,6 +11,7 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 
+import java.net.URI;
 import java.time.Clock;
 
 public class MainVerticle extends AbstractVerticle {
@@ -21,7 +23,8 @@ public class MainVerticle extends AbstractVerticle {
         int port = config().getInteger("port", 8080);
         String baseUrl = config().getString("baseUrl", "http://localhost:" + port);
 
-        LinkService service = new LinkService(new InMemoryLinkStore(), Clock.systemUTC());
+        String ownHost = URI.create(baseUrl).getHost();
+        LinkService service = new LinkService(new InMemoryLinkStore(), Clock.systemUTC(), new UrlValidator(ownHost));
 
         Router router = Router.router(vertx);
         router.get("/health").handler(ctx -> ctx.json(new JsonObject().put("status", "UP")));

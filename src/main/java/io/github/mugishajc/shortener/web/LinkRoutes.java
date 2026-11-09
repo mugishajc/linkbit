@@ -30,11 +30,9 @@ public class LinkRoutes {
 
     private void create(RoutingContext ctx) {
         JsonObject body = jsonBody(ctx);
-        String url = body.getString("url");
-        if (url == null || url.isBlank()) {
-            throw ApiException.badRequest("Field 'url' is required");
-        }
-        service.shorten(url.trim())
+        String url = stringField(body, "url");
+        String alias = stringField(body, "alias");
+        service.shorten(url == null ? null : url.trim(), alias == null || alias.isBlank() ? null : alias.trim())
                 .onSuccess(link -> ctx.response()
                         .setStatusCode(201)
                         .putHeader("Location", baseUrl + "/api/links/" + link.code())
@@ -77,6 +75,14 @@ public class LinkRoutes {
                                 .end(),
                         () -> ctx.fail(ApiException.notFound("No link with code '" + code + "'"))))
                 .onFailure(ctx::fail);
+    }
+
+    private static String stringField(JsonObject body, String name) {
+        Object value = body.getValue(name);
+        if (value != null && !(value instanceof String)) {
+            throw ApiException.badRequest("Field '" + name + "' must be a string");
+        }
+        return (String) value;
     }
 
     private static JsonObject jsonBody(RoutingContext ctx) {
