@@ -8,7 +8,6 @@ release.properties
 # IDE
 .idea/
 *.iml
-.vscode/
 .project
 .classpath
 .settings/
@@ -19,3 +18,5 @@ release.properties
 
 # Logs
 *.log
+config.bat
+node_modules
