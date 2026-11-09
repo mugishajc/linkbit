@@ -23,6 +23,9 @@ public class LinkRoutes {
         router.route("/api/*").handler(BodyHandler.create().setBodyLimit(MAX_BODY_BYTES));
         router.post("/api/links").handler(this::create);
         router.get("/api/links/:code").handler(this::details);
+        router.delete("/api/links/:code").handler(this::delete);
+        // registered last so it never shadows /api or /health
+        router.get("/:code").handler(this::redirect);
     }
 
     private void create(RoutingContext ctx) {
@@ -45,6 +48,33 @@ public class LinkRoutes {
         service.find(code)
                 .onSuccess(found -> found.ifPresentOrElse(
                         link -> ctx.json(link.toJson(baseUrl)),
+                        () -> ctx.fail(ApiException.notFound("No link with code '" + code + "'"))))
+                .onFailure(ctx::fail);
+    }
+
+    private void delete(RoutingContext ctx) {
+        String code = ctx.pathParam("code");
+        service.delete(code)
+                .onSuccess(deleted -> {
+                    if (deleted) {
+                        ctx.response().setStatusCode(204).end();
+                    } else {
+                        ctx.fail(ApiException.notFound("No link with code '" + code + "'"));
+                    }
+                })
+                .onFailure(ctx::fail);
+    }
+
+    private void redirect(RoutingContext ctx) {
+        String code = ctx.pathParam("code");
+        service.resolve(code)
+                .onSuccess(found -> found.ifPresentOrElse(
+                        link -> ctx.response()
+                                .setStatusCode(302)
+                                .putHeader("Location", link.targetUrl())
+                                // every visit must reach us or the click count is wrong
+                                .putHeader("Cache-Control", "no-store")
+                                .end(),
                         () -> ctx.fail(ApiException.notFound("No link with code '" + code + "'"))))
                 .onFailure(ctx::fail);
     }

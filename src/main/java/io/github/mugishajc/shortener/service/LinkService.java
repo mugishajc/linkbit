@@ -27,4 +27,13 @@ public class LinkService {
     public Future<Optional<ShortLink>> find(String code) {
         return store.find(code);
     }
+
+    /** Looks up the link for a redirect and counts the click. */
+    public Future<Optional<ShortLink>> resolve(String code) {
+        return store.recordClick(code, clock.instant());
+    }
+
+    public Future<Boolean> delete(String code) {
+        return store.delete(code);
+    }
 }
