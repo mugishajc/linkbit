@@ -1,5 +1,7 @@
 package io.github.mugishajc.shortener;
 
+import io.github.mugishajc.shortener.ratelimit.RateLimitHandler;
+import io.github.mugishajc.shortener.ratelimit.TokenBucketLimiter;
 import io.github.mugishajc.shortener.service.LinkService;
 import io.github.mugishajc.shortener.service.UrlValidator;
 import io.github.mugishajc.shortener.store.InMemoryLinkStore;
@@ -26,8 +28,17 @@ public class MainVerticle extends AbstractVerticle {
         String ownHost = URI.create(baseUrl).getHost();
         LinkService service = new LinkService(new InMemoryLinkStore(), Clock.systemUTC(), new UrlValidator(ownHost));
 
+        int capacity = config().getInteger("rateLimitCapacity", 20);
+        int refillPerMinute = config().getInteger("rateLimitPerMinute", 20);
+        TokenBucketLimiter limiter = new TokenBucketLimiter(capacity, refillPerMinute / 60d);
+        // forget clients that have gone quiet so the map does not grow forever
+        vertx.setPeriodic(60_000, id -> limiter.evictIdle());
+        RateLimitHandler rateLimit = new RateLimitHandler(limiter, config().getBoolean("trustForwardedFor", false));
+
         Router router = Router.router(vertx);
         router.get("/health").handler(ctx -> ctx.json(new JsonObject().put("status", "UP")));
+        // only link creation is limited; redirects should stay fast and cheap
+        router.post("/api/links").handler(rateLimit);
         new LinkRoutes(service, baseUrl).mount(router);
         router.route().failureHandler(MainVerticle::handleFailure);
 
